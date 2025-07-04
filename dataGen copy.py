@@ -15,8 +15,12 @@ DATE_COLUMN = 'Date'
 DAY_OF_WEEK_COLUMN = 'DayOfWeek'
 MONTH_COLUMN = 'Month'
 HOUR_COLUMN = 'Hour'
+STORAGE_CURRENT_KWH = 'current_storage_kwh',
+STORAGE_CURRENT_PERCENT = 'current_storage_percent',
 VOLUME_COLUMN = 'Volume'
 PRICE_COLUMN = 'Price (EUR)'
+
+PRICE_AVG24_COLUMN = 'price_rolling_avg_24h'
 
 # Your storage system's parameters
 STORAGE_CAPACITY_KWH = 100.0  # Let's assume you have a 100 KWH battery
@@ -26,67 +30,83 @@ MIN_CHARGE_FOR_SELL = 0.1     # Don't sell if battery is less than 10% full
 MAX_CHARGE_FOR_BUY = 0.9      # Don't buy if battery is more than 90% full
 
 #----My code
-dataset = pd.read_csv(DATA_FILE_NAME)
+dataset = pd.read_csv(DATA_FILE_NAME, header=None, sep = ';', skiprows=[0],
+                    names = [DATE_COLUMN, DAY_OF_WEEK_COLUMN, MONTH_COLUMN, HOUR_COLUMN, VOLUME_COLUMN, PRICE_COLUMN])
+
+# Convert to float using astype()
+dataset[PRICE_COLUMN] = dataset[PRICE_COLUMN].astype(float)
+
+# Convert to Unix timestamp seconds
+dataset[DATE_COLUMN] = pd.to_datetime(dataset[DATE_COLUMN])
+dataset[DATE_COLUMN] = (dataset[DATE_COLUMN] - pd.Timestamp("1970-01-01"))
+dataset[DATE_COLUMN] = dataset[DATE_COLUMN].astype(int)
 
 #Add 24h rolling avg
-dataset['price_rolling_avg_24h'] = dataset['Price (EUR)'].rolling(window=24, min_periods=1).mean()
+dataset[PRICE_AVG24_COLUMN] = dataset[PRICE_COLUMN].rolling(window=24, min_periods=1).mean()
 
 
 # b) Create the state of charge (current storage level) - for simplicity, make it random
-dataset['current_storage_kwh'] = np.random.uniform(0, STORAGE_CAPACITY_KWH, size=num_hours)
-dataset['current_storage_percent'] = df['current_storage_kwh'] / STORAGE_CAPACITY_KWH
+
+dataset.insert(3, STORAGE_CURRENT_KWH, np.random.uniform(0, STORAGE_CAPACITY_KWH, size=dataset.shape[0]))
+dataset.insert(4, STORAGE_CURRENT_PERCENT, dataset[STORAGE_CURRENT_KWH] / STORAGE_CAPACITY_KWH)
 
 # --- 3. Define the Target Variable (The "Ground Truth") ---
 # This is the logic the ML model will try to learn.
 
 # Calculate price thresholds based on historical data
-price_buy_threshold = np.percentile(df['price'], BUY_THRESHOLD_PERCENT)
-price_sell_threshold = np.percentile(df['price'], SELL_THRESHOLD_PERCENT)
+price_buy_threshold = np.percentile(dataset[PRICE_COLUMN], BUY_THRESHOLD_PERCENT)
+price_sell_threshold = np.percentile(dataset[PRICE_COLUMN], SELL_THRESHOLD_PERCENT)
 
 print(f"\nPrice to BUY below: {price_buy_threshold:.2f}")
 print(f"Price to SELL above: {price_sell_threshold:.2f}")
 
 def define_action(row):
     # SELL Condition: Price is high AND we have enough energy to sell
-    if row['price'] > price_sell_threshold and row['current_storage_percent'] > MIN_CHARGE_FOR_SELL:
+    if row[PRICE_COLUMN] > price_sell_threshold and row[STORAGE_CURRENT_PERCENT] > MIN_CHARGE_FOR_SELL:
         return "SELL"
     # BUY Condition: Price is low AND we have space to store energy
-    elif row['price'] < price_buy_threshold and row['current_storage_percent'] < MAX_CHARGE_FOR_BUY:
+    elif row[PRICE_COLUMN] < price_buy_threshold and row[STORAGE_CURRENT_PERCENT] < MAX_CHARGE_FOR_BUY:
         return "BUY"
     # HOLD Condition: All other cases
     else:
         return "HOLD"
 
-df['action'] = df.apply(define_action, axis=1)
+dataset['action'] = dataset.apply(define_action, axis=1)
 
 # Drop rows with NaN values created by rolling average
-df = df.dropna()
+# Maybe not needed
+dataset = dataset.dropna()
 
-print("\n--- Data with Features and Target Action ---")
-print(df.head())
 print("\nAction Distribution:")
-print(df['action'].value_counts())
+print(dataset['action'].value_counts())
 
 
 # --- 4. Prepare Data for Machine Learning ---
 
 # Define our features (X) and target (y)
 features = [
-    'price',
-    'current_storage_percent',
-    'hour',
-    'day_of_week',
-    'month',
-    'price_rolling_avg_24h'
+    DATE_COLUMN,
+    DAY_OF_WEEK_COLUMN,
+    MONTH_COLUMN,
+    HOUR_COLUMN,
+    #STORAGE_CURRENT_KWH,
+    #STORAGE_CURRENT_PERCENT,
+    VOLUME_COLUMN,
+    PRICE_COLUMN,
+    PRICE_AVG24_COLUMN 
 ]
-X = df[features]
-y = df['action']
+X = dataset[features]
+y = dataset['action']
 
 # Split data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y # stratify ensures balanced classes in split
 )
 
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler()
+X_train = sc.fit_transform(X_train)
+X_test = sc.transform(X_test)
 
 # --- 5. Train the Machine Learning Model ---
 
@@ -142,12 +162,14 @@ print("\n--- Example Prediction ---")
 # Let's simulate a new situation:
 # Price is very low, battery is half-full, it's late at night in January
 new_data = {
-    'price': 25.0,  # Very cheap
-    'current_storage_percent': 0.5, # 50% full
-    'hour': 2, # 2 AM
-    'day_of_week': 1, # Tuesday
-    'month': 1, # January
-    'price_rolling_avg_24h': 105.0 # Average price has been high
+    DATE_COLUMN:7/7/2025, #7th of July
+    PRICE_COLUMN: 25.0,  # Very cheap
+    STORAGE_CURRENT_PERCENT: 0.5, # 50% full
+    VOLUME_COLUMN: 1000, # some volume
+    HOUR_COLUMN: 2, # 2 AM
+    DAY_OF_WEEK_COLUMN: 1, # Tuesday
+    MONTH_COLUMN: 1, # January
+    PRICE_AVG24_COLUMN: 105.0 # Average price has been high
 }
 
 # Convert to DataFrame to match the training format
