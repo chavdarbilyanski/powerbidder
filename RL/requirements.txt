@@ -1,0 +1,7 @@
+# requirements.txt
+
+stable-baselines3[extra]
+pandas
+matplotlib
+seaborn
+joblib

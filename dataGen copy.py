@@ -251,7 +251,15 @@ env = RL.batteryEnv.BatteryEnv(
 # Instantiate and train the PPO agent
 # PPO is a great, robust algorithm to start with
 model_rl = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./ppo_battery_tensorboard/")
-model_rl.learn(total_timesteps=len(rl_data) * 500) # Train for 5 "epochs"
+model_rl.learn(total_timesteps=len(rl_data) * 200)
+
+# --- 11. Save the Trained RL Agent ---
+print("\n--- Saving RL agent to disk ---")
+RL_MODEL_PATH = "battery_ppo_agent.zip"
+
+model_rl.save(RL_MODEL_PATH)
+
+print(f"RL Agent saved to: {RL_MODEL_PATH}")
 
 
 
