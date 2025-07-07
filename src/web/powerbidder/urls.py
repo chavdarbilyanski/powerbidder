@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.urls import path
-from webbidder.views import upload_csv 
+from webbidder.views import upload_csv
 from django.conf import settings
 from django.conf.urls.static import static
 

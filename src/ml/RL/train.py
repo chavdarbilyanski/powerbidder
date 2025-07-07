@@ -5,7 +5,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 import batteryEnv
 
 # --- 1. Configuration ---
-DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/combine/combined_output_with_features.csv'
+DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/combined_output_with_features.csv'
 RL_MODEL_PATH = "battery_ppo_agent_v2.zip"
 STATS_PATH = "vec_normalize_stats_v2.pkl"
 TOTAL_TIMESTEPS_MULTIPLIER = 400
@@ -18,7 +18,7 @@ PRICE_COLUMN = 'Price (EUR)'
 # --- 2. Data Loading and Preparation ---
 print("Loading and preparing historical data...")
 # Load data into a DataFrame named 'dataset'
-dataset = pd.read_csv(DATA_FILE_NAME, sep=';', decimal=',') # Corrected decimal separator to comma
+dataset = pd.read_csv(DATA_FILE_NAME, sep=';', decimal='.') # Corrected decimal separator to comma
 dataset.rename(columns={'Price (EUR)': PRICE_COLUMN, 'Date': DATE_COLUMN}, inplace=True)
 # Add any other data cleaning or feature engineering here...
 dataset[PRICE_COLUMN] = pd.to_numeric(dataset[PRICE_COLUMN], errors='coerce')

@@ -3,8 +3,8 @@ from datetime import datetime
 import io
 
 # --- Configuration ---
-INPUT_FILENAME = 'combine/combined_output.csv'
-OUTPUT_FILENAME = 'combine/combined_output_with_features.csv'
+INPUT_FILENAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/JanFeb2025.csv'
+OUTPUT_FILENAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/JanFeb2025_output_with_features.csv'
 # ---------------------
 
 
@@ -17,7 +17,9 @@ try:
 
         # 1. Read and write the header row with new column names
         header = next(reader)
-        header.extend(['DayOfWeek', 'Month'])
+        header.insert(1, 'DayOfWeek')
+        header.insert(2, 'Month')
+        # header.extend(['DayOfWeek', 'Month'])
         writer.writerow(header)
 
         # 2. Process each data row
@@ -28,8 +30,8 @@ try:
             date_str = row[0]
 
             try:
-                # 3. Parse the date string (assuming M/D/YY format)
-                date_obj = datetime.strptime(date_str, '%m/%d/%y')
+                # 3. Parse the date string (assuming d/m/YY format)
+                date_obj = datetime.strptime(date_str, '%d/%m/%Y')
                 
                 # 4. Get the day of the week (Monday=0, Sunday=6) and month
                 day_of_week = date_obj.weekday()
