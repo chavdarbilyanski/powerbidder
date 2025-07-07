@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simulation Results</title>
+</head>
+<body>
+    <h1>Trading Simulation Results</h1>
+    <p><strong>Final Battery Charge:</strong> {{ battery_charge }} kWh</p>
+    <p><strong>Total Profit:</strong> ${{ total_profit|floatformat:2 }}</p>
+    <h2>Step-by-Step Results</h2>
+    <table border="1">
+        <tr>
+            <th>Time Step</th>
+            <th>Action</th>
+            <th>Price ($/kWh)</th>
+            <th>Profit Change ($)</th>
+            <th>Battery Charge (kWh)</th>
+        </tr>
+        {% for result in results %}
+        <tr>
+            <td>{{ result.time }}</td>
+            <td>{{ result.time_step }}</td>
+            <td>{{ result.action }}</td>
+            <td>{{ result.price|floatformat:2 }}</td>
+            <td>{{ result.profit_change|floatformat:2 }}</td>
+            <td>{{ result.battery_charge|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="{% url 'upload_csv' %}">Upload Another CSV</a>
+</body>
+</html>

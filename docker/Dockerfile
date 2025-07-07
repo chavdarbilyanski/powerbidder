@@ -24,7 +24,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install Python requirements
 COPY requirements/requirements.txt .
+COPY requirements/requirements-ml.txt .
+
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-ml.txt
+
 
 
 # --- Stage 2: Final Production Image ---
@@ -44,6 +48,9 @@ WORKDIR /home/django/app
 
 # Copy the application source code
 COPY src/web/ .
+
+# Copy the training model
+COPY src/ml/models ./webbidder/
 
 # Change ownership of the files to the non-root user
 RUN chown -R django:django /home/django/app
