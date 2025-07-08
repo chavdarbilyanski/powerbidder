@@ -37,6 +37,18 @@ DEBUG = False  # Set to False for production
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+# Add your Cloud Run URL to the list of trusted origins for POST requests.
+# Make sure to include the "https://" prefix.
+CSRF_TRUSTED_ORIGINS = [
+    'https://webbidder-380536777459.europe-central2.run.app'
+]
+
+# It is also good practice for production to ensure these are set correctly
+# when behind a proxy like Cloud Run.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+
 
 # Application definition
 
