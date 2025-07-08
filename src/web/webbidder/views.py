@@ -15,9 +15,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Battery constraints
-MAX_BATTERY_CAPACITY = 3900.0  # kWh
-CHARGE_DISCHARGE_RATE = 1000.0  # kW per time step
+# Default constants
 MODEL_FILE_NAME = "battery_ppo_agent_v2.zip"
 STATS_FILE_NAME = "vec_normalize_stats_v2.pkl"
 PRICE_COLUMN = "price"
@@ -112,9 +110,9 @@ def preprocess_csv(csv_file):
         logger.error(f"Error in preprocess_csv: {str(e)}")
         raise
 
-def run_inference_and_calculate(df, model, vec_env):
-    logger.debug("Running inference...")
-    battery_charge = INITIAL_BATTERY_PERCENT * MAX_BATTERY_CAPACITY
+def run_inference_and_calculate(df, model, vec_env, max_battery_capacity, charge_discharge_rate):
+    logger.debug(f"Running inference with max_battery_capacity={max_battery_capacity}, charge_discharge_rate={charge_discharge_rate}...")
+    battery_charge = INITIAL_BATTERY_PERCENT * max_battery_capacity
     total_profit = 0.0
     results = []
 
@@ -130,7 +128,7 @@ def run_inference_and_calculate(df, model, vec_env):
         logger.debug(f"Processing: time_step={time_step}, timestamp={timestamp}, hour={hour}, price_mwh={price_mwh}, price_kwh={price_kwh}")
 
         # Battery state BEFORE action
-        battery_percent = battery_charge / MAX_BATTERY_CAPACITY
+        battery_percent = battery_charge / max_battery_capacity
 
         # Use €/MWh for model input
         obs_raw = np.array([
@@ -166,14 +164,14 @@ def run_inference_and_calculate(df, model, vec_env):
         }
 
         # Apply action with max function for battery constraints
-        if action_str == 'BUY' and battery_charge < MAX_BATTERY_CAPACITY:
-            amount = min(CHARGE_DISCHARGE_RATE, MAX_BATTERY_CAPACITY - battery_charge)
+        if action_str == 'BUY' and battery_charge < max_battery_capacity:
+            amount = min(charge_discharge_rate, max_battery_capacity - battery_charge)
             action_details['profit_change'] = -price_kwh * amount
             total_profit += action_details['profit_change']
             battery_charge += amount
             logger.debug(f"BUY: amount={amount}, battery_charge={battery_charge}, profit_change={action_details['profit_change']}")
         elif action_str == 'SELL' and battery_charge > 0:
-            amount = min(CHARGE_DISCHARGE_RATE, battery_charge)
+            amount = min(charge_discharge_rate, battery_charge)
             action_details['profit_change'] = price_kwh * amount
             total_profit += action_details['profit_change']
             battery_charge -= amount
@@ -192,23 +190,30 @@ def upload_csv(request):
     if request.method == 'POST':
         logger.debug("Processing POST request")
         form = CSVUploadForm(request.POST, request.FILES)
+        logger.debug(f"Form data: {request.POST}, Files: {request.FILES}")
         if form.is_valid():
             logger.debug("Form is valid")
             csv_file = request.FILES['csv_file']
-            logger.debug(f"Uploaded file: {csv_file.name}")
+            max_battery_capacity = form.cleaned_data['max_battery_capacity']
+            charge_discharge_rate = form.cleaned_data['charge_discharge_rate']
+            logger.debug(f"Uploaded file: {csv_file.name}, max_battery_capacity={max_battery_capacity}, charge_discharge_rate={charge_discharge_rate}")
             try:
                 df = preprocess_csv(csv_file)
                 logger.debug(f"DataFrame shape: {df.shape}")
                 
                 model, vec_env = load_model_and_env()
-                battery_charge, total_profit, results = run_inference_and_calculate(df, model, vec_env)
+                battery_charge, total_profit, results = run_inference_and_calculate(
+                    df, model, vec_env, max_battery_capacity, charge_discharge_rate
+                )
 
                 logger.debug("Rendering results.html")
                 return render(request, 'results.html', {
                     'battery_charge': battery_charge,
-                    'battery_percent': (battery_charge / MAX_BATTERY_CAPACITY) * 100.0,
+                    'battery_percent': (battery_charge / max_battery_capacity) * 100.0,
                     'total_profit': total_profit,
-                    'results': results
+                    'results': results,
+                    'max_battery_capacity': max_battery_capacity,
+                    'charge_discharge_rate': charge_discharge_rate
                 })
             except Exception as e:
                 logger.error(f"Error in upload_csv: {str(e)}")

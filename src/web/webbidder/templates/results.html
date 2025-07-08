@@ -39,6 +39,8 @@
 </head>
 <body>
     <h1>Trading Simulation Results</h1>
+    <p><strong>Max Battery Capacity:</strong> {{ max_battery_capacity|floatformat:2 }} kWh</p>
+    <p><strong>Charge/Discharge Rate:</strong> {{ charge_discharge_rate|floatformat:2 }} kW per time step</p>
     <p><strong>Final Battery Charge:</strong> {{ battery_charge|floatformat:2 }} kWh</p>
     <p><strong>Final Battery Percent:</strong> {{ battery_percent|floatformat:2 }}%</p>
     <p><strong>Final Total Profit:</strong> €{{ total_profit|floatformat:2 }}</p>
