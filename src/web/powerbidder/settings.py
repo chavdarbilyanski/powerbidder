@@ -23,10 +23,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-=cxdlkk8lr7a4%m^v=#g^*@p4he#f=6j=5=631%f2=mf(yak)&"
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Replace the existing ALLOWED_HOSTS with this
+ALLOWED_HOSTS = [
+    'webbidder-380536777459.europe-central2.run.app',  # GCP Cloud Run domain
+    'localhost',  # For local development
+    '127.0.0.1',  # For local development
+]
 
-ALLOWED_HOSTS = []
+# Ensure other settings are appropriate for GCP
+DEBUG = False  # Set to False for production
+
+# Static files (if using Cloud Storage or serving static files)
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 
 # Application definition
