@@ -29,8 +29,8 @@ DEBUG = env('DEBUG')
 # Load allowed hosts from a comma-separated string (e.g., "localhost,127.0.0.1,mysite.com")
 ALLOWED_HOSTS = env('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',')
 
-# Load trusted origins for POST requests from a comma-separated string
-CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS', default='').split(',')
+# This version filters out any empty strings that result from splitting an empty default.
+CSRF_TRUSTED_ORIGINS = [origin for origin in env('CSRF_TRUSTED_ORIGINS', default='').split(',') if origin]
 
 
 # --- Application definition ---

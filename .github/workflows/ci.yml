@@ -40,5 +40,7 @@ jobs:
           docker run --rm \
             -e SECRET_KEY="a-dummy-secret-key-for-testing" \
             -e DEBUG="False" \
+            -e CSRF_TRUSTED_ORIGINS="http://testserver" \
+            -e MPLCONFIGDIR="/tmp" \
             powerbidder-image:test \
             /opt/venv/bin/python manage.py test
