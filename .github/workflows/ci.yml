@@ -1,0 +1,59 @@
+# .github/workflows/ci.yml
+# This workflow performs a local build check on every push to the main branch.
+# It does NOT deploy to Google Cloud and will NOT incur any GCP costs.
+
+name: Docker Build Check
+
+# 1. Trigger Conditions
+# This workflow runs on every push to the 'main' branch.
+# It also allows you to run it manually from the GitHub Actions tab.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# 2. Jobs
+# A workflow is made up of one or more jobs.
+jobs:
+  build-and-test:
+    name: Build Docker Image
+    # Use the latest version of Ubuntu to run the job
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job.
+    steps:
+      # Step 1: Check out the repository code
+      # This downloads your source code into the GitHub Actions runner.
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Docker Buildx
+      # This is a best practice step that sets up a more advanced builder.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Step 3: Build the Docker image
+      # This command attempts to build the image using your Dockerfile.
+      # It uses --load to make the image available for the next step.
+      # It uses --cache-from and --cache-to for build performance on subsequent runs.
+      - name: Build the Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: . # The build context is the root of the repository
+          dockerfile: docker/Dockerfile # The path to your Dockerfile
+          load: true # Makes the image available to subsequent steps
+          tags: powerbidder-image:test # Give the image a temporary tag
+          cache-from: type=gha,scope=${{ github.workflow }}
+          cache-to: type=gha,scope=${{ github.workflow }},mode=max
+
+      # Step 4 (Optional but Recommended): Run Django tests inside the container
+      # This step verifies not only that the image builds, but that the application
+      # inside it is functional and passes its tests.
+      - name: Run Django Tests
+        run: |
+          docker run --rm \
+            -e SECRET_KEY="a-dummy-secret-key-for-testing" \
+            -e DEBUG="False" \
+            powerbidder-image:test \
+            python manage.py test
