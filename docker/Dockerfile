@@ -54,6 +54,12 @@ COPY src/ml/models ./webbidder/
 # Change ownership of the app directory and its contents to the non-root user
 RUN chown -R django:django /home/django/app
 
+# Run collectstatic as the root user to write to the owned /app directory.
+# Provide a dummy SECRET_KEY and set DEBUG=False for the collectstatic command.
+# This allows Django to initialize without needing the real production secrets.
+# This variable only exists for the duration of this single RUN command.
+RUN SECRET_KEY="dummy-key-for-build" DEBUG=False /opt/venv/bin/python manage.py collectstatic --noinput
+
 # Switch to the non-root user. Subsequent commands will run as 'django'.
 USER django
 
