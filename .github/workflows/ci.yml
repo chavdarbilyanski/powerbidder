@@ -41,4 +41,4 @@ jobs:
             -e SECRET_KEY="a-dummy-secret-key-for-testing" \
             -e DEBUG="False" \
             powerbidder-image:test \
-            python manage.py test
+            /opt/venv/bin/python manage.py test
