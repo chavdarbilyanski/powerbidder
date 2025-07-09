@@ -14,23 +14,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Check out the repository code
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # *** NEW DIAGNOSTIC STEP ***
+      # This step will print a complete, recursive listing of all files in the workspace.
+      # This allows us to see the exact file structure that the runner is working with.
+      - name: List files in the workspace
+        run: ls -laR
+
+      # Step 2: Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # This step has been corrected
+      # Step 3: Build the Docker image
+      # We are using the path that SHOULD be correct. The diagnostic step above will
+      # help us confirm if there's an issue.
       - name: Build the Docker image
+        id: build
         uses: docker/build-push-action@v4
         with:
           context: .
-          dockerfile: ./docker/Dockerfile # <-- THE FIX IS HERE
+          dockerfile: ./docker/Dockerfile
           load: true
           tags: powerbidder-image:test
           cache-from: type=gha,scope=${{ github.workflow }}
           cache-to: type=gha,scope=${{ github.workflow }},mode=max
 
+      # Step 4: Run Django Tests
+      # This step will only run if the build step succeeds.
       - name: Run Django Tests
         run: |
           docker run --rm \
