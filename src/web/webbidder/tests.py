@@ -10,7 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
 
 from .forms import CSVUploadForm
-from .services import process_uploaded_csv
+from .services import run_rl_model_simulation
 
 # --- Test Suite for Views and Forms ---
 
@@ -103,7 +103,7 @@ class ServiceLayerTests(TestCase):
 
     @patch('webbidder.services.PPO.load')
     @patch('webbidder.services.VecNormalize.load')
-    def test_process_uploaded_csv_with_mocked_model(self, mock_vec_load, mock_ppo_load):
+    def test_run_rl_model_simulation_with_mocked_model(self, mock_vec_load, mock_ppo_load):
         """
         Tests the end-to-end data processing logic.
         We "mock" the actual ML model loading to speed up the test and isolate the logic.
@@ -126,7 +126,7 @@ class ServiceLayerTests(TestCase):
         csv_file = StringIO(csv_data) # Use StringIO to simulate a file
 
         # --- Act (Run the function we want to test) ---
-        battery_charge, total_profit, results = process_uploaded_csv(
+        battery_charge, total_profit, results = run_rl_model_simulation(
             csv_file=csv_file,
             max_battery_capacity=100,
             charge_discharge_rate=50
