@@ -1,82 +1,78 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Simulation Results</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .button-container {
-            margin-bottom: 20px;
-        }
-        .button-container a {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #007BFF;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            margin-right: 10px;
-        }
-        .button-container a:hover {
-            background-color: #0056b3;
-        }
-    </style>
-</head>
-<body>
-    <h1>Trading Simulation Results</h1>
-    <p><strong>Max Battery Capacity:</strong> {{ max_battery_capacity|floatformat:2 }} kWh</p>
-    <p><strong>Charge/Discharge Rate:</strong> {{ charge_discharge_rate|floatformat:2 }} kW per time step</p>
-    <p><strong>Final Battery Charge:</strong> {{ battery_charge|floatformat:2 }} kWh</p>
-    <p><strong>Final Battery Percent:</strong> {{ battery_percent|floatformat:2 }}%</p>
-    <p><strong>Final Total Profit:</strong> €{{ total_profit|floatformat:2 }}</p>
-    
-    <div class="button-container">
-        <a href="{% url 'upload_csv' %}">Upload Another CSV</a>
+{% extends "base.html" %}
+
+{% block title %}Simulation Results{% endblock %}
+
+{% block extra_head %}
+<style>
+    .results-container { max-width: 1200px; margin: 20px auto; padding: 20px; }
+    .summary-card { background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; padding: 25px; margin-bottom: 40px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 40px; align-items: center; margin-top: 15px; text-align: center; }
+    .score-container { grid-column: 1 / -1; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
+    .summary-grid strong { display: block; font-size: 1.1em; color: #555; margin-bottom: 5px; }
+    .profit-value { font-weight: bold; font-size: 2em; }
+    .profit-rl { color: #007BFF; }
+    .profit-perfect { color: #28a745; }
+    .score-value { font-size: 2.5em; font-weight: bold; color: #17a2b8; }
+    .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .results-table th, .results-table td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+    .results-table th { background-color: #343a40; color: white; }
+    .results-table tr:nth-child(even) { background-color: #f2f2f2; }
+    .action-buy { color: #28a745; font-weight: bold; }
+    .action-sell { color: #dc3545; font-weight: bold; }
+    .action-hold { color: #6c757d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="results-container">
+    <h1>Simulation Results</h1>
+
+    <!-- Summary Card at the Top -->
+    <div class="summary-card">
+        <h2>Performance Summary</h2>
+        <div class="summary-grid">
+            <div>
+                <strong>Your RL Model's Profit</strong>
+                <span class="profit-value profit-rl">€{{ rl_total_profit|floatformat:2 }}</span>
+            </div>
+            <div>
+                <strong>True Optimal Profit (Oracle)</strong>
+                <span class="profit-value profit-perfect">€{{ perfect_profit|floatformat:2 }}</span>
+            </div>
+            <div class="score-container">
+                <strong>Your Model Achieved</strong>
+                <span class="score-value">{{ performance_score|floatformat:2 }}%</span>
+                of the perfect score.
+            </div>
+        </div>
     </div>
-    
-    <h2>Step-by-Step Results</h2>
-    <table>
-        <tr>
-            <th>Time Step</th>
-            <th>DateTime</th>
-            <th>Hour</th>
-            <th>Action</th>
-            <th>Price (€/kWh)</th>
-            <th>Price Rolling Avg 24h (€/kWh)</th>
-            <th>Profit Change (€)</th>
-            <th>Total Profit (€)</th>
-            <th>Battery Charge (kWh)</th>
-            <th>Battery Percent</th>
-        </tr>
-        {% for result in results %}
-        <tr>
-            <td>{{ result.time_step }}</td>
-            <td>{{ result.timestamp }}</td>
-            <td>{{ result.hour }}</td>
-            <td>{{ result.action }}</td>
-            <td>{{ result.price|floatformat:2 }}</td>
-            <td>{{ result.price_rolling_avg_24h|floatformat:2 }}</td>
-            <td>{{ result.profit_change|floatformat:2 }}</td>
-            <td>{{ result.total_profit|floatformat:2 }}</td>
-            <td>{{ result.battery_charge|floatformat:2 }}</td>
-            <td>{{ result.battery_percent|floatformat:2 }}</td>
-        </tr>
-        {% endfor %}
+
+    <h2>RL Model Hourly Action Log</h2>
+    <table class="results-table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Hour</th>
+                <th>Price (€/kWh)</th>
+                <th>Action</th>
+                <th>Profit/Loss</th>
+                <th>Total Profit</th>
+                <th>Battery State (kWh)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in results %}
+            <tr>
+                <td>{{ row.timestamp }}</td>
+                <td>{{ row.hour }}</td>
+                <td>€{{ row.price|floatformat:4 }}</td>
+                <td class="action-{{ row.action|lower }}">{{ row.action }}</td>
+                <td>€{{ row.profit_change|floatformat:2 }}</td>
+                <td>€{{ row.total_profit|floatformat:2 }}</td>
+                <td>{{ row.battery_charge|floatformat:1 }} ({{ row.battery_percent|floatformat:1 }}%)</td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
-</body>
-</html>
+</div>
+{% endblock %}
