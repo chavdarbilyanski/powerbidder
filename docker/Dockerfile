@@ -51,6 +51,9 @@ COPY src/web/ .
 # Copy the ML models into the correct application sub-directory
 COPY src/ml/models ./powerbidder/
 
+# Copy the ML shared tools
+COPY src/ml/shared ./ml/shared
+
 # Change ownership of the app directory and its contents to the non-root user
 RUN chown -R django:django /home/django/app
 

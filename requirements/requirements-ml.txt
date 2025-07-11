@@ -2,8 +2,8 @@ stable-baselines3[extra]
 pandas
 numpy
 torch
-gym==0.21.0
-shimmy>=2.0
+gym #==0.21.0
+shimmy #>=2.0
 # matplotlib
 # seaborn
 # joblib

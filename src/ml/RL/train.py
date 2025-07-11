@@ -1,74 +1,101 @@
-import pandas as pd
+import gym
+from gym import spaces
 import numpy as np
+import pandas as pd
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
-import batteryEnv
+from stable_baselines3.common.utils import get_linear_fn
+import torch
 
-# --- 1. Configuration ---
-DATA_FILE_NAME = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/combined_output_with_features.csv'
-RL_MODEL_PATH = "battery_ppo_agent_v2.zip"
-STATS_PATH = "vec_normalize_stats_v2.pkl"
-TOTAL_TIMESTEPS_MULTIPLIER = 400
 
-# Column names
-DATE_COLUMN = 'Date'
-PRICE_COLUMN = 'Price (EUR)'
-# ... other column names if needed by your env ...
 
-# --- 2. Data Loading and Preparation ---
-print("Loading and preparing historical data...")
-# Load data into a DataFrame named 'dataset'
-dataset = pd.read_csv(DATA_FILE_NAME, sep=';', decimal='.') # Corrected decimal separator to comma
-dataset.rename(columns={'Price (EUR)': PRICE_COLUMN, 'Date': DATE_COLUMN}, inplace=True)
-# Add any other data cleaning or feature engineering here...
-dataset[PRICE_COLUMN] = pd.to_numeric(dataset[PRICE_COLUMN], errors='coerce')
-dataset[DATE_COLUMN] = pd.to_datetime(dataset[DATE_COLUMN], format='%m/%d/%y', errors='coerce')
-dataset.dropna(inplace=True)
-dataset['price_rolling_avg_24h'] = dataset[PRICE_COLUMN].rolling(window=24, min_periods=1).mean()
-dataset.set_index(DATE_COLUMN, inplace=True)
-dataset.sort_index(inplace=True)
-print(f"Data loaded and processed. Shape: {dataset.shape}")
+# Import the centralized preprocessing functions
+from ml.shared.preprocessing import preprocess_data_for_model, create_observation
 
-# Define the parameters that your BatteryEnv needs
-STORAGE_CAPACITY_KWH = 100.0
-CHARGE_RATE_KW = 25.0
-EFFICIENCY = 0.90
-# --- 3. Create and Wrap the Environment ---
-print("Creating and wrapping the environment...")
-env_creator = lambda: batteryEnv.BatteryEnv(
-    historical_data=dataset,
-    storage_capacity=STORAGE_CAPACITY_KWH,
-    charge_rate=CHARGE_RATE_KW,
-    efficiency=EFFICIENCY
-)
+class BatteryStorageEnv(gym.Env):
+    def __init__(self, data_path, max_battery_capacity=100.0, charge_discharge_rate=50.0):
+        super(BatteryStorageEnv, self).__init__()
 
-env = DummyVecEnv([env_creator])
-env = VecNormalize(env, norm_obs=True, norm_reward=True, gamma=0.999)
+        # --- Data Loading and Preprocessing ---
+        raw_df = pd.read_csv(data_path, sep=';', decimal=',')
+        self.df = preprocess_data_for_model(raw_df)
+        self.n_steps = len(self.df)
 
-print("Environment created successfully.")
+        # --- Environment Parameters ---
+        self.max_capacity = max_battery_capacity
+        self.rate = charge_discharge_rate
+        self.current_step = 0
+        self.battery_charge = 0.0
+        self.efficiency = 0.95
 
-# --- 4. Define and Train the Model ---
-total_timesteps = len(dataset) * TOTAL_TIMESTEPS_MULTIPLIER
+        # --- Define Action and Observation Spaces ---
+        self.action_space = spaces.Discrete(3)  # 0: HOLD, 1: BUY, 2: SELL
+        
+        # The shape must match the number of features from create_observation (10)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32)
 
-model = PPO(
-    "MlpPolicy", 
-    env, 
-    verbose=1, 
-    tensorboard_log="./ppo_battery_tensorboard/",
-    gamma=0.999,
-    n_steps=2048,
-    ent_coef=0.01,
-    learning_rate=0.0003
-)
+    def _get_obs(self):
+        current_row = self.df.iloc[self.current_step]
+        battery_percent = self.battery_charge / self.max_capacity
+        return create_observation(current_row, battery_percent)
 
-print(f"--- Starting new training run for {total_timesteps:,} timesteps ---")
-model.learn(total_timesteps=total_timesteps, progress_bar=True)
-print("--- Training complete ---")
+    def reset(self):
+        self.current_step = 0
+        self.battery_charge = 0.0
+        return self._get_obs()
 
-# --- 5. Save the Model and Normalization Stats ---
-print("Saving model and normalization stats...")
-model.save(RL_MODEL_PATH)
-env.save(STATS_PATH) # This now correctly calls .save() on the VecNormalize object
+    def step(self, action):
+        current_price_mwh = self.df.iloc[self.current_step]['price']
+        price_kwh = current_price_mwh / 1000.0
+        reward = 0
 
-print(f"Model saved to: {RL_MODEL_PATH}")
-print(f"Normalization stats saved to: {STATS_PATH}")
+        if action == 1 and self.battery_charge < self.max_capacity: # BUY
+            amount = min(self.rate, self.max_capacity - self.battery_charge)
+            self.battery_charge += amount
+            reward = -price_kwh * amount
+        elif action == 2 and self.battery_charge > 0: # SELL
+            amount = min(self.rate, self.battery_charge)
+            self.battery_charge -= amount
+            reward = price_kwh * amount
+
+        self.current_step += 1
+        done = self.current_step >= self.n_steps
+        obs = self._get_obs() if not done else np.zeros(self.observation_space.shape)
+
+        return obs, reward, done, {}
+
+if __name__ == '__main__':
+    DATA_PATH = '/Users/chavdarbilyanski/powerbidder/src/ml/data/combine/3years_combined_without_volume.csv' 
+    MODEL_SAVE_PATH = 'src/ml/models/battery_ppo_agent_v3' # Save model and stats
+    
+    # Create and wrap the environment
+    env = DummyVecEnv([lambda: BatteryStorageEnv(data_path=DATA_PATH)])
+    
+    # Normalize the observation space - CRITICAL for good performance
+    env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=10.)
+
+    # Define the PPO model
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    model = PPO(
+        "MlpPolicy",
+        env,
+        verbose=1,
+        n_steps=4096,
+        batch_size=128,
+        gamma=0.99,
+        learning_rate=get_linear_fn(0.0003, 0.0001, 1.0),
+        ent_coef=0.0,
+        clip_range=0.2,
+        n_epochs=10,
+        device=device
+    )
+
+    # Train the model
+    print("--- Starting Model Training ---")
+    model.learn(total_timesteps=1800000, progress_bar=True) # Adjust timesteps as needed
+    print("--- Model Training Complete ---")
+
+    # Save the trained model and the normalization stats
+    model.save(f"{MODEL_SAVE_PATH}.zip")
+    env.save(f"{MODEL_SAVE_PATH}_stats.pkl")
+    print(f"Model and stats saved to {MODEL_SAVE_PATH}.zip and {MODEL_SAVE_PATH}_stats.pkl")
