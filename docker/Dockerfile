@@ -49,7 +49,7 @@ WORKDIR /home/django/app
 COPY src/web/ .
 
 # Copy the ML models into the correct application sub-directory
-COPY src/ml/models ./webbidder/
+COPY src/ml/models ./powerbidder/
 
 # Change ownership of the app directory and its contents to the non-root user
 RUN chown -R django:django /home/django/app

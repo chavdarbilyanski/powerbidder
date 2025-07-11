@@ -26,8 +26,9 @@ class BatteryEnv(gym.Env):
 
 def load_rl_model_and_env():
     logger.info("Loading RL model and environment stats...")
-    model_path = os.path.join(settings.BASE_DIR, 'webbidder', "battery_ppo_agent_v2.zip")
-    stats_path = os.path.join(settings.BASE_DIR, 'webbidder', "vec_normalize_stats_v2.pkl")
+    model_path = os.path.join(settings.BASE_DIR, 'powerbidder', "battery_ppo_agent_v2.zip")
+    stats_path = os.path.join(settings.BASE_DIR, 'powerbidder', "vec_normalize_stats_v2.pkl")
+
     if not os.path.exists(model_path) or not os.path.exists(stats_path):
         raise FileNotFoundError("RL Model or stats file not found.")
     
